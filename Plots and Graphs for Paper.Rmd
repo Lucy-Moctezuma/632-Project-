@@ -1,0 +1,293 @@
+---
+title: "Factors for Life Satisfaction"
+author: "Lucy Moctezuma, Tanvi and Ansont"
+date: "April 9, 2023"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r setup, fig.width=4, fig.height=3, warning=FALSE, message=FALSE, include=FALSE}
+
+# libraries to plot world map data
+library(RColorBrewer)
+library(kableExtra)
+library(rworldmap)
+library(ggthemes)
+library(sf)
+
+# libraries for regular plots
+library(ggplot2)
+library(GGally)
+library(tidyverse)
+library(gridExtra)
+library(ggpubr)
+library(ggcorrplot)
+
+# libraries for data analysis
+library(car)
+library(dplyr)
+library(reshape2) 
+
+# Setting work directory
+setwd("C:/Users/lucyl/Desktop/LEARNING/#00_MASTERS/STAT 632 - Linear and Logistic Regression/Final Project")
+
+# Loading data
+df <- read.csv("merged_df.csv")
+map.world <- map_data(map="world")
+```
+
+
+# Data cleaning before making map
+```{r, warning=FALSE, include=FALSE}
+# Renaming some countries that were named differently
+df$Entity[which(df$Entity=="United States")] = "USA"
+df$Entity[which(df$Entity=="United Kingdom")] = "UK"
+df$Entity[which(df$Entity=="Cote d'Ivoire")] = "Ivory Coast"
+df$Entity[which(df$Entity=="Czechia")] = "Czech Republic"
+rownames(df) <- rownames(df)
+
+# Adding an empty column
+world.map <- cbind(map.world, who_region=NA)
+
+# For loop to assign a region for each coordinate in the map
+count <- 0
+for (x in unique(world.map$region)){
+  if(x %in% df$Entity){
+    for (i in 1:length(world.map$region)){
+       if (x == world.map$region[i]){
+          world.map$who_region[i] <- df$region[which(df$Entity == x)]
+        }
+    }
+  }else{
+    print(paste("Could not find country: ", x))
+    count <- count + 1
+  }
+}
+
+# Checking for all values
+print(length(unique(world.map$region)))
+252 - 13 - 47 - 32 - 20 - 11 - 8
+
+for(x in unique(df$region)){
+  l <- length(df$region[which(df$region == x)])
+  cat(x,":",l,"  ")}
+```
+# Descriptive : lfsa + regions
+```{r, warning=FALSE}
+# Creating map with all regions
+map <- ggplot() +
+      geom_map(data = world.map, map = world.map, 
+               aes(long, lat, map_id = region, fill=who_region), 
+               color = "white",size=0.1) +
+               coord_sf(ylim = c(-50, 90))+
+               theme_map() + labs(fill='Countries per Region') + theme(legend.position ="right", 
+                                                                       legend.background = element_rect(fill=NA), 
+                                                                       legend.title=element_text(size=8),
+                                                                       legend.margin=margin(t = 0, unit='mm')) +
+               scale_fill_hue(labels = c("AFR: 32", "AMR: 20","EMR: 13","EUR: 47", "SEAR: 8", "WPR: 11" , "NA: 121"))
+  
+
+# making function to name outliers
+findoutlier <- function(x) {
+  return(x < quantile(x, .25) - 1.5*IQR(x) | x > quantile(x, .75) + 1.5*IQR(x))
+}
+df <- df %>%
+        group_by(region) %>%
+        mutate(outlier = ifelse(findoutlier(lfsa), Entity, NA))
+
+# making boxplot for life Satisfaction
+lfsaboxplot <- ggplot(df, aes(x=df$region, y=df$lfsa)) + 
+               geom_boxplot(aes(fill=region)) + ylab("Cantril Ladder Score")+ theme(legend.position ="none") + theme(axis.title.x = element_blank())+
+               geom_text(aes(label=outlier), na.rm=TRUE, hjust=-.2)
+               
+# staking both images into one figure
+figure <- ggarrange(map, lfsaboxplot,
+                    labels = c("A"),
+                    ncol = 1, nrow = 2,
+                    heights = c(1.5, 1))
+annotate_figure(figure, top = text_grob("Cantril Ladder Score around the World", size = 14))
+ggsave("lfsa_worldmap.jpeg", bg="white")
+```
+# Descriptives for: Life Expectancy + Internet Access
+```{r}
+lfex_scatter<-ggplot(aes(x=lfex,y=lfsa),data=df)+
+              geom_point(aes(colour =region), size=2)+
+              geom_smooth(method = "lm", colour="grey29", linewidth=1)+
+              theme_bw() + ylab("Cantril Ladder Score") + xlab("Life Expectancy") +theme(legend.direction = "vertical")+
+              geom_text(aes(label=ifelse(lfsa==max(lfsa),as.character(Entity),'')),hjust=1,vjust=0, size=3)+
+              geom_text(aes(label=ifelse(lfsa==min(lfsa),as.character(Entity),'')),hjust=0,vjust=1, size=3)+
+              geom_text(aes(label=ifelse(lfex==min(lfex),as.character(Entity),'')),hjust=0,vjust=0, size=3)+
+              geom_text(aes(label=ifelse(lfex==max(lfex),as.character(Entity),'')),hjust=1,vjust=0, size=3)
+            
+inet_scatter<-ggplot(aes(x=inet,y=lfsa),data=df)+
+              geom_point(aes(colour =region), size=2)+
+              geom_smooth(method = "lm", colour="grey29", linewidth=1)+
+              theme_bw() + theme(axis.title.y = element_blank()) + xlab("% of Population on Internet")+
+              geom_text(aes(label=ifelse(inet==min(inet),as.character(Entity),'')),hjust=0,vjust=1, size=3)+
+              geom_text(aes(label=ifelse(inet==max(inet),as.character(Entity),'')),hjust=1.2,vjust=0, size=3)
+
+gini_scatter<-ggplot(aes(x=gini,y=lfsa, label=Entity),data=df)+
+              geom_point(aes(colour =region), size=2)+
+              geom_smooth(method = "lm", colour="grey29", linewidth=1)+
+              theme_bw() + theme(axis.title.y = element_blank()) + xlab("Gini Index (Income Inequality)") +
+              geom_text(aes(label=ifelse(gini==min(gini),as.character(Entity),'')),hjust=0,vjust=0, size=3)+
+              geom_text(aes(label=ifelse(gini==max(gini),as.character(Entity),'')),hjust=1,vjust=0, size=3)
+  
+
+figure2 <- ggarrange(lfex_scatter, inet_scatter,gini_scatter,
+                    labels = c("B"),
+                    ncol = 3, nrow = 1,
+                    widths =c(1, 1, 1), common.legend = TRUE, legend = "right")
+
+annotate_figure(figure2, top = text_grob("Cantril Ladder Score vs (Life Expectancy, Internet Use, Gini Index)", size = 14))
+
+ggsave("lfex_inet_gini.jpeg", bg="white")
+
+```
+# Descriptives for: Mental Health Indicators
+
+## Graph for all Mental illnesses Except the rarest (Schizophrenia)
+```{r}
+# Reshaping data frame with Mental health variables
+
+#Doing it for rare illnesses
+rare_illness <- c("bipd","eatd")
+rare_illness_list = list()
+for (x in rare_illness){var<-melt(df[,c("Entity", x,"region")])
+                                colnames(var)[3] = "Mental_Health"
+                                colnames(var)[4] = "Rates"
+                                rownames(var) <- 1:nrow(var)
+                                rare_illness_list[[x]]<-var}
+rare_illness_list_data<-bind_rows(rare_illness_list)
+
+rare_box <- ggplot(rare_illness_list_data, aes(x=region, y=Rates))+ 
+          geom_boxplot(aes(fill=region), outlier.size = 0.7)+ facet_wrap(~Mental_Health,  ncol = 1, labeller = labeller(Mental_Health = c("bipd"="Bipolar disorder", "eatd"="Eating Disorder")))+
+          theme(axis.text.x = element_text(angle=90, hjust=1),axis.title.x = element_blank(), axis.title=element_text(size=10))+ggtitle("Rare Disorders")
+         
+
+#Doing it for common illnesses
+common_illness <- c("anxi","depr")
+common_illness_list = list()
+for (x in common_illness){var<-melt(df[,c("Entity", x,"region")])
+                                colnames(var)[3] = "Mental_Health"
+                                colnames(var)[4] = "Rates"
+                                rownames(var) <- 1:nrow(var)
+                                common_illness_list[[x]]<-var}
+common_illness_list_data<-bind_rows(common_illness_list)
+common_box <- ggplot(common_illness_list_data, aes(x=region, y=Rates))+ 
+          geom_boxplot(aes(fill=region), outlier.size = 0.7)+ facet_wrap(~Mental_Health,  ncol = 1, labeller = labeller(Mental_Health = c("anxi" = "Anxiety", "depr"="Depression")))+
+          theme(axis.text.x = element_text(angle=90, hjust=1),axis.title.x = element_blank(), axis.title=element_text(size=10))+ggtitle("Common Disorders")
+          
+
+#Doing it for addictive illnesses
+addict_illness <- c("drgu","aud")
+addict_illness_list = list()
+for (x in addict_illness){var<-melt(df[,c("Entity", x,"region")])
+                                colnames(var)[3] = "Mental_Health"
+                                colnames(var)[4] = "Rates"
+                                rownames(var) <- 1:nrow(var)
+                                addict_illness_list[[x]]<-var}
+addict_illness_list_data<-bind_rows(addict_illness_list)
+addict_box <- ggplot(addict_illness_list_data, aes(x=region, y=Rates))+ 
+          geom_boxplot(aes(fill=region), outlier.size = 0.7)+ facet_wrap(~Mental_Health,  ncol = 1, labeller = labeller(Mental_Health = c("drgu" = "Illicit Drug Abuse","aud"="Alcohol Use Disorder")))+
+          theme(axis.text.x = element_text(angle=90, hjust=1), axis.title.x = element_blank(),axis.title=element_text(size=10))+ggtitle("Addiction Disorders")
+          
+
+figure3 <- ggarrange(rare_box,common_box,addict_box,
+                    labels = c("C"),
+                    ncol = 3, nrow = 1, common.legend = TRUE, legend = "none")
+figure3 
+ggsave("mental_health(no_schizo).jpeg", bg="white")
+```
+## Graph for the rarest Mental Health Disorder (Schizophrenia)
+```{r}
+#Doing it For the most Rare Disease
+schizo <- c("schz")
+schizo_list = list()
+for (x in schizo){var<-melt(df[,c("Entity", x,"region")])
+                                colnames(var)[3] = "Mental_Health"
+                                colnames(var)[4] = "Rates"
+                                rownames(var) <- 1:nrow(var)
+                                schizo_list[[x]]<-var}
+schizo_list_data<-bind_rows(schizo_list)
+schizo_box <- ggplot(schizo_list_data, aes(x=region, y=Rates))+ 
+          geom_boxplot(aes(fill=region))+ theme(axis.title.x = element_blank())+
+          geom_text(aes(label=ifelse(Rates> 0.35,as.character(Entity),'')), hjust=1,vjust=-.2,size=2, position=position_jitter(width=0.02,height=0.02))
+
+schizo_scatter1 <- ggplot(schizo_list_data, aes(x=df$drgu, y=Rates))+ 
+                  geom_point(aes(colour=region))+geom_smooth(method="lm", colour="grey29")+xlab("Drug Use Disorder")
+schizo_scatter2 <- ggplot(schizo_list_data, aes(x=df$aud, y=Rates))+ 
+                  geom_point(aes(colour=region))+geom_smooth(method="lm", colour="grey29")+xlab("Alcohol Use Disorder")
+
+figure4 <- ggarrange(schizo_box,schizo_scatter1,schizo_scatter2,
+                    labels = c("D"),
+                    ncol = 3, nrow = 1, common.legend = TRUE, legend = "none")
+annotate_figure(figure4, top = text_grob("Schizophrenia vs (Region, Drug Use Disorder, Alcohol Use Disorder)", size = 14))
+ggsave("mental_health(schizophrenia).jpeg", bg="white")
+```
+## Mental Health and Life Satisfaction
+```{r}
+df$MH_Means <-apply(df[,c("bipd","eatd","schz","anxi","depr","aud","drgu")],1,mean)
+MHplot<- ggplot(df,aes(x=MH_Means,y=lfsa))+ geom_point(aes(colour=region)) +geom_smooth(method="lm",color="grey26")+
+          xlab("Average Mental Health Prevalence Rates")+ylab("Cantril Ladder Score")+
+          ggtitle("Cantril Ladder Score and Mental Health Prevalence Rates")+
+          geom_text(aes(label=ifelse(MH_Means> 2.50,as.character(Entity),'')),size=3, vjust="inward", hjust="inward")+
+          geom_text(aes(label=ifelse(MH_Means< 1.20,as.character(Entity),'')),size=3)+theme(legend.position = "bottom", legend.title= element_blank())+ guides(colour = guide_legend(nrow = 1))
+
+figure5 <- ggarrange(MHplot,
+                    labels = c("E"),
+                    ncol = 1, nrow = 1)
+figure5
+
+ggsave("mental_health_vs_lfsa.jpeg", bg="white")
+```
+# Descriptives for: Suicide Indicators by age
+## Boxplots by Suicide Age
+```{r}
+suic <- c("suic.5to14","suic.15to49","suic.50to69","suic.70plus")
+suic_list = list()
+for (x in suic){var<-melt(df[,c("Entity", x,"region")])
+                                colnames(var)[3] = "SuicidebyAge"
+                                colnames(var)[4] = "Rates"
+                                rownames(var) <- 1:nrow(var)
+                                var <- var %>%group_by(region) %>% mutate(outlier = ifelse(findoutlier(Rates), Entity, NA))
+                                suic_list[[x]]<-var}
+suic_list_data<-bind_rows(suic_list)
+
+
+suic_box <- ggplot(suic_list_data, aes(x=region, y=Rates))+ 
+          geom_boxplot(aes(fill=region, y=Rates),outlier.size = 0.7)+facet_wrap(~SuicidebyAge, scales = "free")+
+          ggtitle("Suicide Rates by Age Group per Region")+
+          geom_text(aes(label=outlier), position=position_jitter(width=0.2,height=0.1), size=2)+
+          theme(legend.position = "none", axis.title.x = element_blank(), plot.title = element_text(hjust = 0.5))
+
+figure6 <- ggarrange(suic_box,
+                    labels = c("F"),
+                    ncol = 1, nrow = 1)
+figure6
+ggsave("suicide.jpeg", bg="white")
+
+```
+## Relationship between suicide and Homicide with Lfsa
+```{r}
+suic_lfsa <- ggplot(df, aes(x=suic.allages, y=lfsa))+ 
+          geom_point(aes(colour=region))+
+          geom_text(aes(label=ifelse(suic.allages>25,as.character(Entity),'')),size=3, vjust="inward", hjust="inward")+
+          geom_text(aes(label=ifelse(suic.allages==min(suic.allages),as.character(Entity),'')),size=3, vjust="inward", hjust="inward")+
+          guides(colour = guide_legend(nrow = 1))+ylab("Cantril Ladder Score")+xlab("Suicide Rates for All Ages")
+
+homc_lfsa <- ggplot(df, aes(x=homc, y=lfsa))+ 
+          geom_point(aes(colour=region))+
+          geom_text(aes(label=ifelse(homc>25,as.character(Entity),'')),size=3, vjust="inward", hjust="inward")+
+          geom_text(aes(label=ifelse(homc==min(homc),as.character(Entity),'')),size=3, vjust="inward", hjust="inward")+
+          guides(colour = guide_legend(nrow = 1))+ylab("Cantril Ladder Score")+xlab("Homicide Rates")
+
+figure7 <- ggarrange(suic_lfsa,homc_lfsa,
+                    labels = c("G"),
+                    ncol = 2, nrow = 1, common.legend = TRUE, legend="bottom")
+annotate_figure(figure7, top = text_grob("Cantril Ladder Score and Deaths (Suicide and Homicide)", size = 14))
+ggsave("Lfsa_homc_suic.jpeg", bg="white")
+```
+
+
+
