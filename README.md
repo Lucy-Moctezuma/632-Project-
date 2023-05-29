@@ -21,4 +21,4 @@ There is a **Data Sources** folder containing:
 
 **Final Paper**
 
--PDF file created by the 4_Final_Project_Paper_Code.Rmd
+- PDF file created by the 4_Final_Project_Paper_Code.Rmd
