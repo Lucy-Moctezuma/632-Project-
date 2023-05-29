@@ -20,4 +20,5 @@ There is a **Data Sources** folder containing:
 - Data cookbook with all variable explanations
 
 **Final Paper**
+
 -PDF file created by the 4_Final_Project_Paper_Code.Rmd
