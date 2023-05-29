@@ -14,7 +14,10 @@ There are 4 RMD files:
 **4_Final_Project_Paper_Code.Rmd**
 - Rmd file used to produce final PDF paper
 
-There is a Data folder containing:
+There is a **Data Sources** folder containing:
 
 - All raw data extracted from the website "Our World in Data"
 - Data cookbook with all variable explanations
+
+**Final Paper**
+-PDF file created by the 4_Final_Project_Paper_Code.Rmd
