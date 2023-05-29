@@ -1,0 +1,317 @@
+---
+title: |
+  | \vspace{0.3cm}\fontsize{30pt}{2pt}\textbf{Relationships between}
+  | \vspace{0.5cm}\fontsize{30pt}{2pt}\textbf{Cantril Ladder Score’s} 
+  | \vspace{0.5cm}\fontsize{30pt}{2pt}\textbf{Mental Health \& Other Factors}
+author: "\\fontsize{16pt}{3pt}\\textbf{Lucy Moctezuma Tan}"
+date: "\\fontsize{14pt}{3pt}May 29, 2023"
+output: 
+  pdf_document:
+    extra_dependencies: ["wrapfig"]
+sansfont: Calibri Light
+header-includes: 
+  - \renewcommand{\and}{\\}
+  - \usepackage[justification=raggedright,labelfont=bf,singlelinecheck=false]{caption}
+  - \usepackage{titling}
+  - \pretitle{\begin{flushleft}}
+  - \posttitle{\end{flushleft}}
+  - \preauthor{\begin{flushleft}\Large}
+  - \postauthor{\end{flushleft}}
+  - \predate{\begin{flushleft}}
+  - \postdate{\end{flushleft}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Users/lucyl/Desktop/LEARNING/#00_MASTERS/STAT 632 - Linear and Logistic Regression/Final Project/Final-Paper_files")
+library(knitr)
+library(ggplot2)
+library(kableExtra)
+library(psych)
+library(stringr)
+library(tidyverse)
+library(openintro)
+library(emmeans)
+library(ggplot2)
+library(car)
+library(dplyr)
+library(devtools)
+library(stringr)
+library(caret)
+```
+
+```{r, echo=FALSE, fig.align = 'right', out.width="60%"}
+knitr::include_graphics("ladder.png")
+```
+
+\newpage
+
+# Introduction
+The World Happiness Report$^1$ is an annual report produced by the Sustainable Development Solutions Network (SDSN), a group launched in 2012 under the supervision of the UN Secretary-General. Data used in the World Happiness Report is sourced from the Gallup World Poll to rank 156 countries by how happy their citizens perceive themselves to be$^2$. The purpose of the report, according to the SDSN, is to provide a quantified assessment of the happiness of people as a "true measure of progress"$^3$. Authors of the report highlight the report is a product of policy-makers desire to make their populations happiness and well-being as a goal of their policies.
+
+Currently, the World Happiness Report uses life evaluations from the Gallup World Poll data to provide the basis for their rankings$^4$. Using the Cantril Ladder Score$^5$, a widely used well-being assessment, respondents from individual countries are asked where they believe their own lives fall on a scale (or ladder) from 0 to 10 (0 being the worst and 10 being the best possible life). The report goes on to estimate associations between Cantril Ladder Scores and six variables: GDP per capita, social support, healthy life expectancy, freedom, generosity, and corruption.
+
+Here, we expand the assessment of variables to include additional measures of mental health, geography, economic inequality, violence, and internet access. We hope to explore what the relationship, if any, is between these predictors and our response variable (Cantril Ladder Score) and whether using an interaction model using variables of interest would improve our final model. We will use various measures of model performance, specifically adjusted $R^2$, AIC, Root Mean Square Error (RMSE), and Mean Absolute Error (MAE) as our model selection metrics. The results of this analysis may offer added insight to improve future surveys ultimately to better inform social policies to improve a nation's happiness as measured by Cantril Ladder Scores.
+
+# Data Description
+The data used in this analysis is a composite of 8 different datasets, each containing different variables. Seven of the 8 datasets related to quality of human life were acquired from the website called "Our World in Data"$^6$. The underlying original source of data found for the datasets in Our World in Data is the Gallup World Poll$^7$. Geographical region related data is sourced from the World Health Organization (WHO)$^8$. The Our World in Data website releases data on different aspects related to the quality of human life around the world on an annual basis. The data used for analysis is from the year 2019 which was specifically selected to ensure the most recently acquired year of data not impacted by the extreme social disruption caused by the COVID19 pandemic. The 2019 dataset may be a more representative dataset of the relationship between our selected predictor variables and the response variable.
+
+As shown in Table 1, the first dataset contains a response variable called the Cantril Ladder Score, which is a life satisfaction measure and is sourced from Esteban Ortiz-Ospina and Max Roser's "Happiness and Life Satisfaction" $^9$. The second dataset includes explanatory variables related to mental health, these would include mental health disorders such as: schizophrenia, bipolar disorder, eating disorders, anxiety, (Illicit) drug use, depression, and alcohol use disorder. These variables are sourced from Saloni Dattani, Hannah Ritchie, and Max Roser's "Mental Health"$^{10}$. The third dataset contains explanatory variables related to suicide, including “suicide all ages”, and suicide by age sub-groups: suicide 5-14, suicide 15-49, suicide 50-69, and suicide 70+. These variables are sourced from Hannah Ritchie, Max Roser, and Esteban Ortiz-Ospina's "Suicide"$^{11}$. Similarly other explanatory variables are Life Expectancy$^{12}$, Internet Access$^{13}$, Homicide$^{14}$, Gini Index$^{15}$, and Region (see Table 1 for their respective category and source). 
+
+```{r, echo=FALSE }
+text_tbl <- data.frame(
+Category = c("Life Satisfaction", "Mental Disorders","Suicide", "Safety", "Economic", "General Health", "Technology Access", "Geography"),
+Variables = c("Cantril Ladder Score", "Schizophrenia, Bipolar Disorder, Eating Disorder, Anxiety, Drug Use, Depression, Alcohol Use Disorder", "Suicide (All Ages), Suicide (5-14), Suicide (15-49), Suicide (50-69), Suicide (70+)", "Homicide","Gini Index","Life Expenctancy", "Internet Access", "WHO Region"),
+Features = c("Esteban Ortiz-Ospina and Max Roser - Happiness and Life Satisfaction",
+"Saloni Dattani, Hannah Ritchie and Max Roser - Mental Health", "Hannah Ritchie, Max Roser and Esteban Ortiz-Ospina - Suicide", "Max Roser and Hannah Ritchie - Homicides", "Max Roser and Esteban Ortiz-Ospina - Income Inequality", "Max Roser, Esteban Ortiz-Ospina and Hannah Ritchie - Life Expectancy", "Max Roser, Hannah Ritchie and Esteban Ortiz-Ospina- Internet", "WHO List of Regions - https://www.who.int/countries")
+)
+
+kbl(text_tbl, booktabs = T, caption = "List of Variables and Sources", linesep = "") %>%
+  kable_styling(full_width = F, position = "left", latex_options = "hold_position") %>%
+  row_spec(0, bold = T, background = "#375a8a", color = "white") %>%
+  pack_rows("Response Variable", 1, 1, color= "#375a8a") %>%
+  row_spec(1, hline_after = T) %>%
+  pack_rows("Explanatory Variables", 2, 8, color = "#375a8a") %>%
+  pack_rows("Mental Health", 2, 3, color="#375a8a", italic = T ) %>%
+  pack_rows("Other Social Factors", 4, 8, color = "#375a8a", italic = T) %>%
+  column_spec(1, bold = T, color = "black", width = "12em") %>%
+  column_spec(2, width = "8em") %>%
+  column_spec(3, width = "20em")  
+```
+We combined these datasets and used "Country Name" as the index. Lastly, each country name was assigned a "Region" categorical variable to it based on WHO list of regions. The size of this combined data was 2000 rows, which included several years, each row corresponding to a particular country and all the years available since the beginning of their data collection. In order to isolate 2019 as the year of interest, we decided to filter all the other available years for each type of variable with the exception of the Gini Index, because there were many countries with missing values for the year 2019. For this reason, we instead decided to include the latest year of gini index values available at or prior to 2019. The year of collection of the Gini Index values were not included within our formal regression analysis. All other numerical variables in the analysis correspond uniquely to the year of 2019. The final dataset had 131 rows, each row corresponding to a unique country and 18 columns. All variables were ratio data, with the exception of WHO Region, a categorical variable. For a detailed explanation of each variable you are welcome to check the sources mentioned in the table, for a summarized version you can access the data cookbook, located in the github repository link listed towards the end of this paper.   
+
+Table 2 presents the summary statistics for the numeric variables presented (i.e., mean values, variance and ranges). We can observe that variables present different ranges. Notice that different Mental Disorders vary considerably, for instance we can see that Depression has a range from 2.2 to 6.69, whereas schizophrenia is from 0.2 to 0.47. We can observe that these differences in ranges were even more dramatic for the Suicide Variables by Age. Given these differences in range, we decided to conduct 2 separate regression analysis, one using mean centering and standardization in order to better gage the importance of each variable, then we also conducted the same analysis without this manipulation for an easier interpretation. A detailed explanation of these results are specified in the results section of this paper.
+
+```{r, echo=FALSE }
+# load and view data
+df <- read.csv(file ="merged_df.csv",header=TRUE)
+#Make country names into index now and subsetting
+data <- subset(df, select=-c(Entity, year))
+rownames(data) <- df$Entity
+data$region <- as.factor(data$region)
+sum.stat<-describe(data)[c(1:17),c("mean","sd","min","max")]
+rownames(sum.stat) <- c("Cantril Ladder Score", "Life Expectancy", "Internet", "Schizophrenia", "Bipolar Disorder", "Eating Disorder", "Anxiety", "Drug Use", "Depression", "Alcohol Use Disorder", "Suicide-All ageslettera","Suicide (5 to 14)", "Suicide (15 to 49)", "Suicide (50 to 69)", "Suicide (70+)", "Homicide","Gini Index")
+
+tab <-kbl(sum.stat, booktabs = T, caption = "Summary Statistics for all Numerical Variables", digits=2) %>%
+ kable_styling(full_width = F, position = "left", latex_options = "hold_position") %>%
+  row_spec(0, bold = T, background="#375a8a", color = "white") %>%
+  column_spec(1, bold = T, width = "15em") %>%
+  column_spec(2, bold = F, width = "5em") %>%
+  column_spec(3, bold = F, width = "5em") %>%
+  column_spec(4, bold = F, width = "5em") %>%
+  column_spec(5, bold = F, width = "5em") %>%
+  footnote(alphabet = c("Not included due to Collinearity with the other Suicide variables"))
+
+knitr::asis_output(str_replace_all(tab, c("lettera"="$^{a}$")))
+```
+\newpage 
+
+\begin{wrapfigure}{r}{0.65\textwidth}
+  \caption*{\textbf{Figure A:} Cantril Ladder Scores Around the World}
+  \includegraphics{lfsa_worldmap2.jpeg}
+\end{wrapfigure}
+
+Figure A shows the variation in Cantril Ladder Score around the word. Data was available for 131 countries (color-coded by WHO-assigned region), the numbers next to each region correspond to the number of countries that were included for each of the regions, some regions are more highly represented than others, with the European regions being more represented than South East Asian regions for example. Also notice that there are 121 regions that are not represented in our map, these would encompass: countries that are not affiliated with WHO, countries that were removed due to missing data and regions that do not constitute a country, such as the case of Antarctica. Based on visual review of the box plot in Figure A, the European region has the highest average Cantril Ladder Scores, followed by the American region, while the African region has the lowest Cantril Ladder Score of the regions. The notable outlier in the American region is Haiti, showing as the lowest Cantril Ladder Score within America. In addition, the Eastern Mediterranean region appears to have the widest intra-group variation. All WHO regions are based on the location of their offices around the world, thus countries are not necessarily related socially or culturally.
+
+## Mental Health Measures
+### Mental Disorders
+\begin{figure}
+  \caption*{\textbf{Figure B:} Mental Disorders Prevalence Rates by Region}
+  \includegraphics{mental_disorders(boxplots).jpeg}
+\end{figure}
+
+Figure B box plots show different mental health disorders by region. We can see that different mental disorders show different prevalence rates overall, with some disorders being more common globally such as depression and some far less common such as the case of schizophrenia, the rarest disorder in our data. We can also see there is a fair amount of variability and outliers between WHO regions, nevertheless there are some notable observations to point out. For common disorders such as depression, we see that there are two outlier countries from the African region (i.e, Lesotho and Uganda) and in general there seems to be higher rates of depression in the African and Eastern Mediterranean Region. We do not see this pattern for Anxiety Disorders, however we do see that the European Region has the biggest variability in Anxiety, whereas the African and the Southeast Asian Region show the lowest variability. The Southeast Asian Region only has 8 countries so that may explain in part the lower variability, however the European and African Regions do not differ on the number of countries represented by much (32 versus 47) and yet we have a stark contrast in variability. For Uncommon disorders, which happen to fall in the general category of Substance Abuse, we observe that Illicit Drug Abuse tends to be higher in industrialized, wealthy and culturally western (Northern European and former colonies), this is not the case for Alcohol Abuse Disorders. As expected we see a really low prevalence rates of alcohol in the Eastern Mediterranean region, which is expected given that some countries in this region ban alcohol use given religious customs. Finally for Rare disorders we see that Schizophrenia has a similar pattern to Illicit Drug Use, where western, industrialized and wealthier countries tend have higher prevalence rates. Additionally, the European and the Western Pacific Region Area also show higher variability in terms of Bipolar and Eating Disorders, with New Zealand and Australia being particularly high outliers in our dataset.
+
+To have an overview of Mental Disorders Prevalence Rates and it's relationship with Cantril Ladder score, we created a composite variable by averaging all mental disorders prevalence rates and plotting these in a scatter plot against our response variable, we also color coded the regions to check if there were any significant patterns found. In Figure C, we see that counter intuitively,  we saw an overall a positive relationship between the Cantril ladder score around the world and Mental Disorders Prevalence Rates, as mental prevalence rates rises so does the Cantril ladder score. 
+
+\begin{wrapfigure}{l}{0.65\textwidth}
+  \caption*{\textbf{Figure C:} Cantril Ladder Scores and Average Mental Disorders Prevalence Rates by Region}
+  \includegraphics{mental_health_vs_lfsa.jpeg}
+\end{wrapfigure}
+
+However, on closer inspection, we noticed that we see higher mental disorder prevalence rates in the American and European region than other regions, therefore mental disorder rates vary based on regions, as in some regions tend to generally report lower rates (i.e, African region) than others. Based solely in visual inspection, The only significant positive relationship happens within European Region, this positive relationship also shows for the American region, albeit less pronounced; finally this was also the case for the Western Pacific Region, although it is clear that this is due only to 2 outlier countries. We mainly see that the African and the Eastern Mediterranean Region have inverse relationships as expected, as mental health disorders rise, the Cantril Ladder Scores lower. These differences in relationships might be due because different mental disorders may related differently to the Cantril Ladder Score, therefore we decide to do our formal analysis using individual mental disorders rather than using our composite variable.
+
+### Suicide Rates
+
+Another Measure of Mental Health we considered was Suicide Rates. Similarly to Mental Health Disorders, We wanted to observe the general suicide rates as well as suicide broken down by different ages in relation to the Cantril Ladder Score. In Figure D, interestingly, we see that Suicide rates regardless of age does not seem to have a strong linear relationship with the Cantril Ladder Score. The figure shows the labels for some of the countries that have in general high suicide rates. Additionally and as expected the rates of suicide of younger people to be a lot common than for older people in general. We can observe that within the African region, the country of Lesotho is an outlier for Suicides rates for people 15 and older. In addition we notice that within the European region, Suicide rates for younger (i.e, ages 49 and below) tend to be more frequent within eastern European regions. From the Western Pacific Region, we can see that Japan and particularly South Korea tends to have the highest Suicide rates for older populations. Finally, based on graphical observation alone, Suicide rates for 70 and older are highest in the African region.
+
+\begin{figure}
+  \caption*{\textbf{Figure D:} Suicide Rates by Age groups and Region}
+  \includegraphics{suicide.jpeg}
+\end{figure}
+
+## Other Social and Economic factors
+
+\begin{wrapfigure}{l}{0.65\textwidth}
+  \caption*{\textbf{Figure E:} Suicide Rates by Age groups and Region}
+  \includegraphics{othervar_lfsa.jpeg}
+\end{wrapfigure}
+
+Given that mental health measures may not capture life satisfaction entirely, we included other variables such as internet access, life expectancy, homicide, Gini index (as a measure of economic inequality). Below in Figure E, we show the relationship between Cantril Ladder Scores and these other variables. We notice that most variables seem to have a linear relationship with the Cantril ladder Score, internet being the strongest positive relationship from the variables presented. In addition we see that the African region in general seem to have lower life expectancy, with most of the countries having an average age of mortality below 70 years. Homicide did not have a linear relationship with the Cantril ladder score, however we did noticed higher rates of homicide within Latin America. The four scatter plots also labels the countries with the highest and lowest values for each variable. In terms of Gini Index we can see that the European region tends to have the lowest economic inequality, whereas African regions tend to have higher inequality. In terms of internet access, we can also see that more countries in the African region have lower internet access.
+
+# Methods and Results
+
+## Hypothesis Testing Analysis
+
+Log transformation was performed on seven predictor variables determined to be skewed based on visual review of histograms and quantile-quantile plots. The mental disorder variables which underwent log transformation were: schizophrenia, eating disorder and drug use prevalence rates. The data for homicide and suicide rates for all age sub-groups, except for suicides rates for 50 to 69 years old, were also log transformed. Multicollinearity was assessed visually using scatter plots as well as calculating the variance inflation factor (VIF). One variable, "Suicide-All Ages" showed a VIF higher than 5. As this variable is a composite of the age sub-groups it was removed to allow for interpretation by each age subgroup. Two sets of  multiple linear regression were used only for an additive model, we aimed to see if any variables were statistically significantly associated with Cantril Ladder Scores. The first set was conducted using the original values, these were the ones used for ease of interpretations in the project, the second set was conducted using standardized and mean centered values, in order to compare effect coefficients to determine which variables were more important in the model. Our response variable did not require transformation upon assessment with the BoxCox transformation function in R. The additive model, without additional variable transformations or selection, was used to explore 3 different interaction models, with the aim to search for possible variables in the additive model which may alter the effects of the other predictors. We only used unscaled variables for our interaction models. 
+
+Given the large number of predictors and limited degrees of freedom, each author selected a variable of interest to further investigate interaction models. For the first interaction model, (illicit) Drug Abuse was tested against the other predictor variables in a linear regression model. The step() function from the stats package in R was then used to perform an automated backwards elimination process to select the best reduced set of predictor variables. This procedure was repeated for 2 additional interaction models, (Gini index and Internet access). Three partial F-tests were performed to check if relevant coefficients from our full interaction models were discarded during automated variable selection, these tests all produced large p-values indicating the reduced interaction models were viable options. Our full additive model and all final three interaction models passed assumptions for linearity and constant variance.
+
+## Additive Model
+
+Overall the additive unscaled regression model was statistically significant (adjusted $R^2= 0.71$, $F(20,110)=17.04$, $p < 0.01$) and showed that internet usage, log(eating disorder rates) and Eastern Mediterranean region were significantly associated with Cantril Ladder Scores (Table 3). Of note, different mental health disorders appear to have different associations with life satisfaction. For example, depression is positively associated with the response variable, whereas anxiety is negatively associated with it. 
+
+```{r, echo=FALSE}
+
+addmodel<- lm(lfsa ~ lfex + inet + log(schz)+ bipd + log(eatd) + anxi + log(drgu) + depr + aud + log(suic.5to14) + log(suic.15to49) + suic.50to69 + log(suic.70plus) + log(homc) + gini + region, data = data)
+
+addmodel_std<- lm(scale(lfsa) ~ scale(lfex) + scale(inet) + scale(log(schz))+ scale(bipd) + scale(log(eatd)) + scale(anxi) + scale(log(drgu)) + scale(depr) + scale(aud) + scale(log(suic.5to14)) + scale(log(suic.15to49)) + scale(suic.50to69) + scale(log(suic.70plus)) + scale(log(homc)) + scale(gini) + region, data = data)
+
+# Additive Model
+add <- cbind(summary(addmodel)$coefficients[,1], 
+             summary(addmodel_std)$coefficients[,1],
+             summary(addmodel)$coefficients[,4])
+colnames(add) <- c("Coefficient","Scaled Coefficient", "P-values")
+
+kbl(add,booktabs=T, caption = "Additive Model Results for Regular and Scaled Coefficients", digits = 3) %>%
+kable_styling(full_width = F, latex_options = "hold_position") %>% 
+row_spec(row=0, bold = T) %>%
+row_spec(row=3, color = "white", background = "gray", bold = T) %>%
+row_spec(row=6, color = "white", background = "gray", bold = T) %>%
+row_spec(row=18, color = "white", background = "gray", bold = T)
+```
+
+For our standardized regression coefficients, we see that the highest positive coefficient from our numerical variables correspond to the log transformed Eating disorder prevalence rates. Several mental health related variables are positively associated with the Cantril ladder score, however because prevalence rates were collected from different studies and there was a dearth of research for some of the countries and not others, mental health variables could potentially be confounded with under reporting from countries with a lack of mental health advocacy, access, barriers due to cultural stigmas, or a sample bias in their studies. These potential issues were also discussed by the original sources of the datasets used in the analysis. Note that the African region does not appear because it was considered as our control level for the region variable.
+
+## Interaction Models
+
+### Drug Use Interaction Model Results
+
+Each interaction model which was investigated was found to be significant as well. Results for the log(drug abuse) interaction model demonstrated three statistically significant interactions for the following variables: anxiety rates, internet usage and depression rates (Table 4b). A positive interaction term means as log(drug use) rate increases, anxiety rates ($\beta= -0.003$) become more negatively associated with Cantril Ladder Scores and internet usage ($\beta= 0.032$) becomes more positively associated with it. On the other hand, given the negative coefficient for the interaction between log(drug use) rates and depression rates, an increase in log(drug use) seems to lower the negative association between depression rates ($\beta= -0.134$) and Cantril ladder scores. In other words, it dampens this negative relationship. These changes in effect sizes could potentially mean that mental health disorders should not be viewed as a monolithic variable and instead additional research may be needed to determine how these disorders affect each other (i.e, co morbidity for Mental Health Disorders) and other variables that affect life satisfaction.
+
+### Gini Index Interaction Model Results
+
+Results for the Gini index interaction model showed three statistically significant interactions for the variables: log(eating disorder), log(suicide rates for the age groups 15 to 49 years old), and log(suicide rates for people 70 and older) (Table 4c). As Gini Index values increases, meaning that as economic inequality in a country increase, log(eating disorder) ($\beta= 3.836$), log(suicide rates for age groups 15 to 49 years old) ($\beta=1.122$), and log(suicide rates for age groups for 70 years and older) ($\beta= 1.218$), become less positively associated with Cantril Ladder Scores. This indicates that as economic inequality gets worse, the other variables become less important predictors for life satisfaction.
+
+### Internet Access Interaction Model Results
+
+For the internet access interaction model, results showed another three statistically significant positive coefficients for interactions with the variables: Bipolar Disorder, log(suicide rates for age groups 15 to 49 years) and with region SEAR (Table 4d). As internet access increases, bipolar disorder rates ($\beta= -5.97$), log(suicide rates for age groups 15 to 49 years) ($\beta= -0.484$) and living in the SEAR region ($\beta= -2.868$), become more negatively associated with Cantril Ladder scores. Indicating that higher rates of internet usage seem to exacerbate this negative association with the response.
+
+Table 4 shows us all the interactions kept after applying the step function. The rows that are color coded by interaction model and in bold font represent the interactions that were found significant.
+
+```{r, echo=FALSE}
+# Drug Interaction Model
+drgu_model<- lm(lfsa ~ (lfex + inet + log(schz)+ bipd + log(eatd) + anxi + log(drgu) + depr + aud + log(suic.5to14) +log(suic.15to49) + suic.50to69 + log(suic.70plus) + log(homc) + gini + region)*log(drgu), data = data)  
+drgu_model2<-step(drgu_model, trace=0)
+drg <- summary(drgu_model2)$coefficients[c(15:23),c(1,2,4)]
+colnames(drg) <- c("Coefficient","Std. Error", "P-values")
+
+# Gini Interaction Model
+gini_model<- lm(lfsa ~ (lfex + inet + log(schz)+ bipd + log(eatd) + anxi + log(drgu) + depr + aud + log(suic.5to14) + log(suic.15to49) + suic.50to69 + log(suic.70plus) + log(homc) + gini + region)*gini, data = data)
+gini_model2<-step(gini_model, trace=0)
+gin <- summary(gini_model2)$coefficients[c(14:16),c(1,2,4)]
+colnames(gin) <- c("Coefficient","Std. Error", "P-values")
+
+# Internet Interaction Model
+inet_model<- lm(lfsa ~ (lfex + inet + log(schz)+ bipd + log(eatd) + anxi + log(drgu) + depr + aud + log(suic.5to14) + log(suic.15to49) + suic.50to69 + log(suic.70plus) + log(homc) + gini + region)*inet, data = data)
+inet_model2<-step(inet_model, trace=0)
+inet <- summary(inet_model2)$coefficients[c(17:27),c(1,2,4)]
+colnames(inet) <- c("Coefficient","Std. Error", "P-values")
+
+Merged <- do.call("rbind", list(drg, gin, inet))
+kbl(Merged,booktabs=T, digits = 3, caption = "Results for All Interaction models tested") %>%
+    kable_styling(full_width = F, position = "center", latex_options = "HOLD_position") %>%
+    row_spec(row=0, bold = T) %>%
+    pack_rows("Illicit Drug Abuse Interaction Model Results", 1, 9, color = "white", background = "#8a284a", bold = T) %>%
+    row_spec(row=1, color = "#8a284a", bold = T) %>%
+    row_spec(row=3, color = "#8a284a", bold = T) %>%
+    row_spec(row=4, color = "#8a284a", bold = T) %>%
+    pack_rows("Gini Interaction Model Results", 10, 12, color="white" , background = "#459981", bold = T)%>%
+    row_spec(row=10, color="#459981", bold = T) %>%
+    row_spec(row=11, color="#459981", bold = T) %>%
+    row_spec(row=12, color="#459981", bold = T) %>%
+    pack_rows("Internet Interaction Model Results", 13, 23, color="white" , background = "#6188c7", bold = T) %>%
+    row_spec(row=14, color="#6188c7", bold = T) %>%
+    row_spec(row=18, color="#6188c7", bold = T) %>%
+    row_spec(row=22, color="#6188c7", bold = T) 
+
+
+```
+
+## Search for the Optimal Predictive Model
+
+Due to time constraints for the project and a lack of degrees of freedom, it was not feasible to thoroughly check all possible interactions, however it is worthwhile to determine which of the four models investigated produced the best predictions for our entire dataset. Cross validation testing was performed using different metrics including Root Mean Square Error (RMSE), Adjusted R squared, and Mean Absolute Error (MAE), and Akaike information criterion (AIC) for all four models. It was determined that the internet access interaction model was the optimal model, as it had the lowest RMSE, MAE, AIC and the highest adjusted $R^2$ (Table 5).
+
+```{r, echo=FALSE}
+pred <- addmodel %>% predict(data[,-1])
+add_df<-data.frame( R2 = R2(pred, data$lfsa),
+RMSE = RMSE(pred, data$lfsa),
+MAE = MAE(pred, data$lfsa),
+AIC = AIC(addmodel))
+
+pred_inet <- inet_model2 %>% predict(data[,-1])
+i_df<-data.frame( R2 = R2(pred_inet, data$lfsa),
+RMSE = RMSE(pred_inet, data$lfsa),
+MAE = MAE(pred_inet, data$lfsa),
+AIC = AIC(inet_model2))
+
+pred_gini <- gini_model2 %>% predict(data[,-1])
+g_df<- data.frame( R2 = R2(pred_gini, data$lfsa),
+RMSE = RMSE(pred_gini, data$lfsa),
+MAE = MAE(pred_gini, data$lfsa), 
+AIC = AIC(gini_model2))
+
+pred_drgu <- drgu_model2 %>% predict(data[,-1])
+d_df<- data.frame( R2 = R2(pred_drgu, data$lfsa),
+RMSE = RMSE(pred_drgu, data$lfsa),
+MAE = MAE(pred_drgu, data$lfsa),
+AIC = AIC(drgu_model2))
+
+total <- rbind(add_df,i_df, g_df, d_df)
+rownames(total) <- c("Additive model","Internet Interaction model","Gini Interaction model","Drug Interaction model")
+
+total%>%
+  kable(booktabs=T,caption = "Crossvalidation Results", digits = 3) %>%
+  kable_styling(full_width = F, position = "center", latex_options = "HOLD_position") %>%
+  row_spec(row=2, background ="#6188c7", bold = T, color="white")
+```
+
+# Conclusions
+
+We were successfully able to generate 4 separate models, one additive and three interaction models, which each met the assumptions for a valid multiple linear regression model. While the initial additive model performed reasonably well, with an adjusted $R^2$ of 0.76, the introduction of interaction terms markedly improved this measure in subsequent interaction models. Each of the interaction terms of interest, drug use, Gini index, and internet access, had notably larger adjusted $R^2$ values than the additive model and improved AIC, RMSE, and MAE values as well. The optimal model, in terms of performance by adjusted $R^2$, AIC, RMSE, and MAE values, is the internet access interaction model which includes predictors for internet access, mental health issues, suicide rates, and world region. 
+
+We believe the internet access, solely, may not itself lead to more life satisfaction however a high degree of internet access may be a proxy for numerous other factors within a country including better infrastructure, stronger economy, improved ability to maintain meaningful communication with others, and potential for social mobility. These factors are known to, or can be reasonably expected, to positively impact the happiness at the individual and population levels. Strengths of this analysis include using well-curated datasets from a reputable source which was collected prior to the COVID19 pandemic. Such data would not be impacted from the significant social disruptions of the worldwide health crisis and may be a better representation of "normal" at the global scale. 
+
+Limitations of this analysis include but are not limited to the following: We are unable to investigate outliers and leverage points beyond identifying their presence. Given the number of predictors in our dataset, there may be additional and more informative single, two-way, and three-way interactions present within the data which would warrant additional investigation. Exploring additional polynomial regressions for the drug use interaction model may be necessary given the curvilinear shape to the residuals vs fitted plot. Future directions for this research would be to compare the selected internet access interaction model with a model generated using only the six variables used by the World Happiness Report to determine if our selected model offers a notable improvement. To check the residual plots for each of the four models please refer to Figure F in the Appendix section.
+
+As mentioned previously, wide variability was seen in the prevalence of mental health disorders in specific, culturally heterogeneous regions, like the WPR, SEAR, and EUR. Further investigating the relationship of these variables within the socio cultural context rather than geographic context may yield additional insight into how cultural vs social policy barriers (e.g. lack of reporting infrastructure or mental healthcare access) may affect mental health and life satisfaction.
+
+\newpage
+
+# Appendix:
+
+\begin{figure}
+  \centering
+  \caption*{\textbf{Figure F:} Residual Plots for Assumption Checking for all Models}
+\setkeys{Gin}{width=0.5\linewidth}
+  \includegraphics{addmodel_residplots.jpeg}\,%
+  \includegraphics{drgu_inter_residplots.jpeg}
+  
+  \includegraphics{gini_inter_residplots.jpeg}\,%
+  \includegraphics{inet_inter_residplots.jpeg}
+\end{figure}
+
+## R Code Repository:
+
+<https://github.com/Lucy-Moctezuma/632-Project->
+
+## Citations:
+
+1.  [World Happiness Report, Executive Summary.](https://worldhappiness.report/ed/2023/executive-summary/)
+2.  [United Nations Sustainable Development Solutions Network.](https://www.unsdsn.org/happiness-and-well-being-research)
+3.  [World Happiness Report, 2022.](https://happiness-report.s3.amazonaws.com/2022/WHR+22.pdf)
+4.  [World Happiness Report, About.](https://worldhappiness.report/about/)
+5.  [Understanding How Gallup Uses the Cantril Scale.](https://news.gallup.com/poll/122453/understanding-gallup-uses-cantril-scale.aspx)
+6.  [Our World In Data.](https://ourworldindata.org/)
+7.  [Global Datasets for Public Use.](https://www.gallup.com/analytics/318923/world-poll-public-datasets.aspx)
+8.  [List of Countries by WHO Regions.](https://www.who.int/countries)
