@@ -1,5 +1,7 @@
 # Final Project for CSUEB STAT-632
+
 This folder contains 4 RMD files:
+
 1_Data_Cleaning_Code.Rmd
 - Code to gather and clean up data
 
